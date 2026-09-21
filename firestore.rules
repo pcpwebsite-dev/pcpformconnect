@@ -2,11 +2,22 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn(){ return request.auth != null; }
+    match /app_config/{docId} {
+      allow read: if true;
+      allow create, update, delete: if signedIn();
+    }
+    match /admin_audit/{auditId} {
+      allow read, create: if signedIn();
+      allow update, delete: if false;
+    }
     match /forms/{formId} {
       allow read: if signedIn() || resource.data.published == true;
       allow create, update, delete: if signedIn();
       match /responses/{responseId} {
-        allow create: if request.resource.data.keys().hasOnly(['answers','email','submittedAt','userAgent','formVersion'])
+        allow create: if get(/databases/$(database)/documents/app_config/site).data.releaseStatus == 'live'
+          && get(/databases/$(database)/documents/app_config/site).data.submissionsEnabled != false
+          && get(/databases/$(database)/documents/forms/$(formId)).data.published == true
+          && request.resource.data.keys().hasOnly(['answers','email','submittedAt','userAgent','formVersion'])
           && request.resource.data.answers is map
           && request.resource.data.answers.size() <= 100
           && (!request.resource.data.keys().hasAny(['email']) || (request.resource.data.email is string && request.resource.data.email.size() <= 320))

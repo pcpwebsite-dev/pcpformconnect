@@ -1,32 +1,14 @@
-<!doctype html>
-<html lang="id">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PCP Forms — Dashboard</title><link rel="stylesheet" href="../css/common.css"><link rel="stylesheet" href="../css/admin.css"></head>
-<body>
-<div class="bg"></div>
-<header class="topbar"><div class="bar"><a class="brand" href="#"><img src="../asset/logo/txt.png"><div class="copy"><b>PERSONA</b><b>COMMUNITY</b><b>PLAYER</b></div></a><nav class="nav"><a class="active" href="./dashboard.html">FORMS</a><a href="./responses.html">RESPONSES</a></nav><div class="actions"><button class="btn icon-btn" id="theme">◐</button><button class="btn" id="logout">SIGN OUT</button></div></div></header>
-<main class="container page">
-<section class="dash-head"><div><span class="badge">FIRESTORE / ADMIN</span><h1>Form <span>Workspace</span></h1><p class="muted">Buat, kelola, publish, preview, dan monitor seluruh form PCP.</p></div><button class="btn primary" id="newForm">+ NEW FORM</button></section>
-<section class="stats"><div class="card stat"><small>TOTAL FORMS</small><b id="formCount">0</b></div><div class="card stat"><small>PUBLISHED</small><b id="publishedCount">0</b></div><div class="card stat"><small>RESPONSES</small><b id="responseCount">0</b></div></section>
-<section id="forms" class="forms-grid"></section>
-</main>
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PCP Forms — Workspace</title><link rel="stylesheet" href="../css/common.css"><link rel="stylesheet" href="../css/admin.css"></head><body><div class="bg"></div>
+<header class="topbar"><div class="bar"><a class="brand" href="./dashboard.html"><img src="../asset/logo/txt.png"><div class="copy"><b>PERSONA</b><b>COMMUNITY</b><b>PLAYER</b></div></a><nav class="nav"><a class="active" href="./dashboard.html">FORMS</a><a href="./responses.html">RESPONSES</a></nav><div class="actions"><button class="btn icon-btn" id="theme" title="Theme">◐</button><button class="btn" id="logout">SIGN OUT</button></div></div></header>
+<main class="container page"><section class="dash-head"><div><span class="badge">PCP / FORM WORKSPACE</span><h1>Build forms.<br><span>Collect better data.</span></h1><p class="muted">Create, publish, duplicate, share, and monitor forms from one workspace.</p></div><button class="btn primary" id="newForm">+ NEW FORM</button></section>
+<section class="stats"><div class="card stat"><small>TOTAL FORMS</small><b id="formCount">—</b></div><div class="card stat"><small>PUBLISHED</small><b id="publishedCount">—</b></div><div class="card stat"><small>TOTAL RESPONSES</small><b id="responseCount">—</b></div></section>
+<div class="toolbar"><input id="search" placeholder="Search forms…"><select id="filter" style="max-width:180px"><option value="all">All status</option><option value="published">Published</option><option value="draft">Draft</option></select></div><section id="forms" class="forms-grid"><div class="card empty">Loading workspace…</div></section></main>
 <script type="module">
-import {auth,db,onAuthStateChanged,signOut,collection,getDocs,addDoc,serverTimestamp,getCountFromServer,doc,deleteDoc} from "../js/firebase.js";
-const formsEl=document.querySelector("#forms");
-let user;
-onAuthStateChanged(auth,u=>{if(!u)location.href="./index.html";else{user=u;load()}});
-logout.onclick=()=>signOut(auth);
-theme.onclick=()=>document.body.classList.toggle("light");
-newForm.onclick=async()=>{const ref=await addDoc(collection(db,"forms"),{title:"Untitled PCP Form",description:"",published:false,createdBy:user.uid,createdAt:serverTimestamp(),updatedAt:serverTimestamp(),settings:{collectEmail:false,showProgress:false,confirmationMessage:"Terima kasih atas respons Anda.",shuffleQuestions:false}});location.href="./builder.html?id="+ref.id};
-async function load(){
- const snap=await getDocs(collection(db,"forms")); formsEl.innerHTML="";let pub=0,res=0;
- for(const d of snap.docs){const f=d.data();if(f.published)pub++;let count=0;try{count=(await getCountFromServer(collection(db,"forms",d.id,"responses"))).data().count}catch(e){}res+=count;
- const card=document.createElement("article");card.className="form-card card";card.innerHTML=`<div class="form-card-top"><span class="badge ${f.published?"published":"draft"}">${f.published?"PUBLISHED":"DRAFT"}</span><button class="dots">•••</button></div><h3>${esc(f.title||"Untitled")}</h3><p>${esc(f.description||"No description")}</p><div class="form-meta"><span>${count} response${count!==1?"s":""}</span><span>${f.updatedAt?.toDate?f.updatedAt.toDate().toLocaleDateString("id-ID"):"—"}</span></div><div class="form-actions"><button class="btn edit">EDIT</button>${f.published?`<button class="btn open">OPEN</button>`:""}<button class="btn danger delete">DELETE</button></div>`;
- card.querySelector(".edit").onclick=()=>location.href="./builder.html?id="+d.id;
- if(card.querySelector(".open"))card.querySelector(".open").onclick=()=>window.open("../form/index.html?id="+d.id,"_blank");
- card.querySelector(".delete").onclick=async()=>{if(confirm("Hapus form ini beserta dokumen form?")){await deleteDoc(doc(db,"forms",d.id));load()}};
- formsEl.appendChild(card)}
- formCount.textContent=snap.size;publishedCount.textContent=pub;responseCount.textContent=res;
-}
-function esc(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
-</script>
-</body></html>
+import {auth,db,onAuthStateChanged,signOut,collection,getDocs,addDoc,serverTimestamp,getCountFromServer,doc,deleteDoc,getDoc,setDoc} from '../js/firebase.js';import{initTheme,toast,esc,fmtDate}from'../js/ui.js';initTheme();let user,items=[];const formsEl=document.querySelector('#forms');
+onAuthStateChanged(auth,u=>{if(!u)location.href='./index.html';else{user=u;load()}});logout.onclick=()=>signOut(auth);newForm.onclick=createForm;search.oninput=render;filter.onchange=render;
+async function createForm(){newForm.disabled=true;try{const ref=await addDoc(collection(db,'forms'),{title:'Untitled PCP Form',description:'',published:false,createdBy:user.uid,createdAt:serverTimestamp(),updatedAt:serverTimestamp(),questions:[],settings:{collectEmail:false,showProgress:true,confirmationMessage:'Terima kasih atas respons Anda.',shuffleQuestions:false}});location.href='./builder.html?id='+ref.id}catch(e){toast('Failed to create form');newForm.disabled=false}}
+async function load(){try{const snap=await getDocs(collection(db,'forms'));items=await Promise.all(snap.docs.map(async d=>{let count=0;try{count=(await getCountFromServer(collection(db,'forms',d.id,'responses'))).data().count}catch{}return{id:d.id,...d.data(),count}}));items.sort((a,b)=>(b.updatedAt?.seconds||0)-(a.updatedAt?.seconds||0));formCount.textContent=items.length;publishedCount.textContent=items.filter(x=>x.published).length;responseCount.textContent=items.reduce((n,x)=>n+x.count,0);render()}catch(e){formsEl.innerHTML='<div class="card empty">Could not load forms. Check Firebase access.</div>'}}
+function render(){const q=search.value.toLowerCase().trim(),f=filter.value;const list=items.filter(x=>(!q||(x.title||'').toLowerCase().includes(q)||(x.description||'').toLowerCase().includes(q))&&(f==='all'||(f==='published'&&x.published)||(f==='draft'&&!x.published)));formsEl.innerHTML='';if(!list.length){formsEl.innerHTML='<div class="card empty">No forms match this view.</div>';return}list.forEach(x=>{const el=document.createElement('article');el.className='form-card card';el.innerHTML=`<div class="form-card-top"><span class="badge ${x.published?'published':'draft'}">${x.published?'● PUBLISHED':'DRAFT'}</span></div><h3>${esc(x.title||'Untitled')}</h3><p>${esc(x.description||'No description yet.')}</p><div class="form-meta"><span>${x.count} response${x.count===1?'':'s'}</span><span>${fmtDate(x.updatedAt)}</span></div><div class="form-actions"><button class="btn primary edit">EDIT</button><button class="btn open">${x.published?'OPEN':'PREVIEW'}</button><button class="btn copy">DUPLICATE</button><button class="btn danger delete">DELETE</button></div>`;el.querySelector('.edit').onclick=()=>location.href='./builder.html?id='+x.id;el.querySelector('.open').onclick=()=>window.open('../form/index.html?id='+x.id,'_blank');el.querySelector('.copy').onclick=()=>duplicate(x);el.querySelector('.delete').onclick=()=>remove(x);formsEl.appendChild(el)})}
+async function duplicate(x){try{const src=await getDoc(doc(db,'forms',x.id));const d=src.data();delete d.createdAt;delete d.updatedAt;const ref=await addDoc(collection(db,'forms'),{...d,title:(d.title||'Untitled')+' — Copy',published:false,createdBy:user.uid,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});toast('Form duplicated');location.href='./builder.html?id='+ref.id}catch{toast('Duplicate failed')}}
+async function remove(x){if(!confirm(`Delete “${x.title||'this form'}”? Responses under this form will no longer be accessible from the app.`))return;try{await deleteDoc(doc(db,'forms',x.id));items=items.filter(i=>i.id!==x.id);load();toast('Form deleted')}catch{toast('Delete failed')}}
+</script></body></html>

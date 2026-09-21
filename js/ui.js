@@ -1,0 +1,4 @@
+export function initTheme(){const saved=localStorage.getItem('pcp-theme');if(saved==='light')document.body.classList.add('light');document.querySelector('#theme')?.addEventListener('click',()=>{document.body.classList.toggle('light');localStorage.setItem('pcp-theme',document.body.classList.contains('light')?'light':'dark')})}
+export function toast(msg){document.querySelector('.toast')?.remove();const x=document.createElement('div');x.className='toast';x.textContent=msg;document.body.appendChild(x);setTimeout(()=>x.remove(),2200)}
+export function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+export function fmtDate(ts){try{return ts?.toDate?.().toLocaleString('id-ID',{dateStyle:'medium',timeStyle:'short'})||'—'}catch{return '—'}}
